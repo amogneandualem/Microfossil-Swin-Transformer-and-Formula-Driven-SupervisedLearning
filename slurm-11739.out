@@ -413,19 +413,19 @@ Epoch 6/50 - 22.5s
 Epoch 7/50 - 22.3s
   Train: Loss 0.5508, Acc 83.43%
   Val:   Loss 0.6396, Acc 81.32%
-  💾 New best model saved: 81.32%
+   New best model saved: 81.32%
 Epoch 8/50 - 22.4s
   Train: Loss 0.4935, Acc 84.80%
   Val:   Loss 0.5788, Acc 82.69%
-  💾 New best model saved: 82.69%
+  New best model saved: 82.69%
 Epoch 9/50 - 22.3s
   Train: Loss 0.4348, Acc 86.45%
   Val:   Loss 0.5550, Acc 82.97%
-  💾 New best model saved: 82.97%
+  New best model saved: 82.97%
 Epoch 10/50 - 22.4s
   Train: Loss 0.3863, Acc 88.13%
   Val:   Loss 0.5437, Acc 83.65%
-  💾 New best model saved: 83.65%
+   New best model saved: 83.65%
   Saving progress curves to epoch_10.png...
 Epoch 11/50 - 22.4s
   Train: Loss 0.3484, Acc 88.92%
@@ -433,14 +433,14 @@ Epoch 11/50 - 22.4s
 Epoch 12/50 - 22.4s
   Train: Loss 0.3041, Acc 90.39%
   Val:   Loss 0.5587, Acc 84.62%
-  💾 New best model saved: 84.62%
+   New best model saved: 84.62%
 Epoch 13/50 - 22.4s
   Train: Loss 0.2760, Acc 91.42%
   Val:   Loss 0.5278, Acc 84.34%
 Epoch 14/50 - 22.5s
   Train: Loss 0.2452, Acc 92.35%
   Val:   Loss 0.5289, Acc 85.85%
-  💾 New best model saved: 85.85%
+   New best model saved: 85.85%
 Epoch 15/50 - 22.4s
   Train: Loss 0.2252, Acc 92.83%
   Val:   Loss 0.5606, Acc 84.75%
@@ -459,7 +459,7 @@ Epoch 19/50 - 22.3s
 Epoch 20/50 - 22.4s
   Train: Loss 0.1218, Acc 96.43%
   Val:   Loss 0.5968, Acc 86.54%
-  💾 New best model saved: 86.54%
+   New best model saved: 86.54%
   Saving progress curves to epoch_20.png...
 Epoch 21/50 - 22.4s
   Train: Loss 0.1236, Acc 96.40%
@@ -473,7 +473,7 @@ Epoch 23/50 - 22.4s
 Epoch 24/50 - 22.3s
   Train: Loss 0.0874, Acc 97.27%
   Val:   Loss 0.6757, Acc 86.95%
-  💾 New best model saved: 86.95%
+  New best model saved: 86.95%
 Epoch 25/50 - 22.3s
   Train: Loss 0.0715, Acc 97.86%
   Val:   Loss 0.7424, Acc 85.44%
@@ -558,56 +558,56 @@ Epoch 50/50 - 22.4s
   Val:   Loss 0.8236, Acc 87.09%
   Saving progress curves to epoch_50.png...
 
-📊 Evaluating rcdb on test set...
+ Evaluating rcdb on test set...
   Loaded best model from epoch 37 (Val Acc: 87.23%)
-🎯 Test Accuracy: 0.8521
-✅ Completed rcdb: Test Acc = 0.8521
+Test Accuracy: 0.8521
+Completed rcdb: Test Acc = 0.8521
 
 
 ==================== STARTING REPLICATE 2/3 ====================
 
 ============================================================
-🎯 PROCESSING IMAGENET PRE-TRAINING
+ PROCESSING IMAGENET PRE-TRAINING
 ============================================================
-🔄 Loading imagenet model...
-✅ Loaded 87,079,364 parameters from imagenet
+ Loading imagenet model...
+ Loaded 87,079,364 parameters from imagenet
 
-🚀 Training imagenet
+Training imagenet
 ==================================================
 Epoch 1/50 - 22.4s
   Train: Loss 1.9324, Acc 54.38%
   Val:   Loss 0.8374, Acc 78.71%
-  💾 New best model saved: 78.71%
+   New best model saved: 78.71%
 Epoch 2/50 - 22.5s
   Train: Loss 0.7041, Acc 81.35%
   Val:   Loss 0.5064, Acc 84.07%
-  💾 New best model saved: 84.07%
+   New best model saved: 84.07%
 Epoch 3/50 - 22.4s
   Train: Loss 0.4603, Acc 86.98%
   Val:   Loss 0.4132, Acc 86.54%
-  💾 New best model saved: 86.54%
+  New best model saved: 86.54%
 Epoch 4/50 - 22.5s
   Train: Loss 0.3524, Acc 89.57%
   Val:   Loss 0.3600, Acc 88.87%
-  💾 New best model saved: 88.87%
+   New best model saved: 88.87%
 Epoch 5/50 - 22.4s
   Train: Loss 0.2867, Acc 91.61%
   Val:   Loss 0.3518, Acc 88.05%
 Epoch 6/50 - 22.5s
   Train: Loss 0.2352, Acc 92.95%
   Val:   Loss 0.3412, Acc 89.97%
-  💾 New best model saved: 89.97%
+   New best model saved: 89.97%
 Epoch 7/50 - 22.5s
   Train: Loss 0.1841, Acc 94.25%
   Val:   Loss 0.3237, Acc 90.25%
-  💾 New best model saved: 90.25%
+   New best model saved: 90.25%
 Epoch 8/50 - 22.4s
   Train: Loss 0.1601, Acc 94.99%
   Val:   Loss 0.3241, Acc 89.29%
 Epoch 9/50 - 22.3s
   Train: Loss 0.1339, Acc 96.04%
   Val:   Loss 0.3408, Acc 90.52%
-  💾 New best model saved: 90.52%
+   New best model saved: 90.52%
 Epoch 10/50 - 22.3s
   Train: Loss 0.1047, Acc 96.95%
   Val:   Loss 0.3546, Acc 89.29%
@@ -621,7 +621,7 @@ Epoch 12/50 - 22.3s
 Epoch 13/50 - 22.4s
   Train: Loss 0.0552, Acc 98.58%
   Val:   Loss 0.3726, Acc 91.07%
-  💾 New best model saved: 91.07%
+   New best model saved: 91.07%
 Epoch 14/50 - 22.3s
   Train: Loss 0.0427, Acc 98.92%
   Val:   Loss 0.4035, Acc 89.42%
@@ -634,7 +634,7 @@ Epoch 16/50 - 22.5s
 Epoch 17/50 - 22.6s
   Train: Loss 0.0256, Acc 99.40%
   Val:   Loss 0.4222, Acc 91.21%
-  💾 New best model saved: 91.21%
+   New best model saved: 91.21%
 Epoch 18/50 - 22.4s
   Train: Loss 0.0184, Acc 99.64%
   Val:   Loss 0.4566, Acc 90.11%
@@ -682,7 +682,7 @@ Epoch 31/50 - 22.3s
 Epoch 32/50 - 22.3s
   Train: Loss 0.0049, Acc 99.90%
   Val:   Loss 0.5782, Acc 91.35%
-  💾 New best model saved: 91.35%
+   New best model saved: 91.35%
 Epoch 33/50 - 22.4s
   Train: Loss 0.0044, Acc 99.90%
   Val:   Loss 0.5805, Acc 90.66%
@@ -740,7 +740,7 @@ Epoch 50/50 - 22.4s
   Val:   Loss 0.5831, Acc 91.07%
   Saving progress curves to epoch_50.png...
 
-📊 Evaluating imagenet on test set...
+📊 Evaluating Imagenet on test set...
   Loaded best model from epoch 32 (Val Acc: 91.35%)
 🎯 Test Accuracy: 0.9041
 ✅ Completed imagenet: Test Acc = 0.9041
@@ -1639,22 +1639,22 @@ Epoch 50/50 - 22.4s
   Val:   Loss 0.8235, Acc 85.44%
   Saving progress curves to epoch_50.png...
 
-📊 Evaluating rcdb on test set...
+ Evaluating rcdb on test set...
   Loaded best model from epoch 27 (Val Acc: 85.99%)
-🎯 Test Accuracy: 0.8466
-✅ Completed rcdb: Test Acc = 0.8466
+ Test Accuracy: 0.8466
+Completed rcdb: Test Acc = 0.8466
 
 ============================================================
-🏆 FINAL RESULTS SUMMARY ACROSS 3 REPLICATES
+FINAL RESULTS SUMMARY ACROSS 3 REPLICATES
 ============================================================
 imagenet     - Mean Val:  90.89%, Mean Test: 0.9027 (Std Dev: 0.0030)
 exfractal    - Mean Val:  91.85%, Mean Test: 0.9041 (Std Dev: 0.0089)
 rcdb         - Mean Val:  86.49%, Mean Test: 0.8571 (Std Dev: 0.0112)
 
-🎯 BEST MODEL (Mean): exfractal with 0.9041 accuracy
-🎉 CONGRATULATIONS! ACHIEVED 90%+ MEAN ACCURACY! 🎉
+ BEST MODEL (Mean): exfractal with 0.9041 accuracy
+ Run by Amogne Andualem! ACHIEVED 90%+ MEAN ACCURACY! 🎉
 
-📁 All results saved to: ./swin_final_results_advanced
+ All results saved to: ./swin_final_results_advanced
   - final_summary_all_replicates.csv: Comparative table of mean results across all replicates.
   - sample_images/: Sample images showing Original, Resized, and Augmented versions.
   - Replicate_X/: Individual folders for each run with model checkpoints and plots.
