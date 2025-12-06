@@ -1,0 +1,4 @@
+Model,Mean Best Val Accuracy (%),Mean Test Accuracy,Test Std Dev
+imagenet,90.89,0.9027,±0.0030
+exfractal,91.85,0.9041,±0.0089
+rcdb,86.49,0.8571,±0.0112
