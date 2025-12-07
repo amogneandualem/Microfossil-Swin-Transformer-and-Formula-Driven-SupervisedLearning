@@ -63,7 +63,7 @@ if torch.cuda.is_available():
 # ==================== HELPER FUNCTION: SAVE SAMPLE IMAGES ====================
 def save_sample_images(dataset, output_dir, num_samples=5):
     """Saves original, resized, and augmented versions of sample images."""
-    print(f"\n🖼️ Saving {num_samples} sample images (Original vs. Resized/Augmented)...")
+    print(f"\n Saving {num_samples} sample images (Original vs. Resized/Augmented)...")
     sample_dir = os.path.join(output_dir, "sample_images")
     os.makedirs(sample_dir, exist_ok=True)
     
@@ -106,7 +106,7 @@ def save_sample_images(dataset, output_dir, num_samples=5):
         except Exception as e:
             print(f"Warning: Could not save sample image {img_path}: {e}")
             
-    print("✅ Sample images saved in swin_final_results_advanced/sample_images/")
+    print(" Sample images saved in swin_final_results_advanced/sample_images/")
 
 
 # ==================== EFFICIENT DATA PIPELINE (with RandAugment) ====================
@@ -212,7 +212,7 @@ def load_model_safely(model_type="imagenet"):
             model_dict.update(pretrained_dict)
             model.load_state_dict(model_dict, strict=False)
             
-            print(f"✅ Loaded {loaded_params_count:,} parameters from {model_type}")
+            print(f" Loaded {loaded_params_count:,} parameters from {model_type}")
             
         except Exception as e:
             print(f"⚠️ Could not load weights for {model_type}: {e}. Model will start from scratch/timm default.")
@@ -402,7 +402,7 @@ class MemoryEfficientTrainer:
             self.model.load_state_dict(checkpoint['model_state_dict'])
             print(f"  Loaded best model from epoch {checkpoint['epoch']+1} (Val Acc: {checkpoint['val_accuracy']:.2f}%)")
         else:
-            print("  ⚠️ Best model checkpoint not found. Evaluating on last epoch's model.")
+            print("   Best model checkpoint not found. Evaluating on last epoch's model.")
         
         self.model.eval()
         all_preds = []
@@ -429,7 +429,7 @@ class MemoryEfficientTrainer:
                                              target_names=class_names,
                                              output_dict=True, zero_division=0)
         
-        print(f"🎯 Test Accuracy: {accuracy:.4f}")
+        print(f" Test Accuracy: {accuracy:.4f}")
         
         cm = confusion_matrix(all_labels, all_preds)
         plt.figure(figsize=(18, 16)) 
@@ -460,7 +460,7 @@ def run_experiment(dataset, train_loader, val_loader, test_loader, replicate_dir
     for model_type in model_types:
         try:
             print(f"\n{'='*60}")
-            print(f"🎯 PROCESSING {model_type.upper()} PRE-TRAINING")
+            print(f" PROCESSING {model_type.upper()} PRE-TRAINING")
             print(f"{'='*60}")
             
             if torch.cuda.is_available():
@@ -482,10 +482,10 @@ def run_experiment(dataset, train_loader, val_loader, test_loader, replicate_dir
                 'class_report': eval_results['class_report']
             }
             
-            print(f"✅ Completed {model_type}: Test Acc = {eval_results['test_accuracy']:.4f}")
+            print(f" Completed {model_type}: Test Acc = {eval_results['test_accuracy']:.4f}")
             
         except Exception as e:
-            print(f"❌ Error during processing of {model_type}: {e}")
+            print(f" Error during processing of {model_type}: {e}")
             import traceback
             traceback.print_exc()
             continue
@@ -496,19 +496,19 @@ def run_experiment(dataset, train_loader, val_loader, test_loader, replicate_dir
 def main():
     print("🚀 SWIN TRANSFORMER - MEMORY EFFICIENT TRAINING (ADVANCED OPTIMIZED)")
     print("=" * 60)
-    print(f"📁 Base Output Directory: {Config.OUTPUT_DIR}")
-    print(f"🔄 Number of Replicates: {Config.REPLICATES}")
-    print(f"💻 Device: {Config.DEVICE}")
-    print(f"📦 Batch size: {Config.BATCH_SIZE}")
-    print(f"📅 Epochs per experiment: {Config.EPOCHS}")
-    print(f"🧠 Model: {Config.MODEL_NAME}")
+    print(f" Base Output Directory: {Config.OUTPUT_DIR}")
+    print(f" Number of Replicates: {Config.REPLICATES}")
+    print(f" Device: {Config.DEVICE}")
+    print(f" Batch size: {Config.BATCH_SIZE}")
+    print(f" Epochs per experiment: {Config.EPOCHS}")
+    print(f" Model: {Config.MODEL_NAME}")
     print("=" * 60)
     
     if Config.DEVICE.type == 'cpu':
-        print("\n🚨 WARNING: Job is running on CPU. Check SLURM logs for 'Device: cuda' confirmation.")
+        print("\n WARNING: Job is running on CPU. Check SLURM logs for 'Device: cuda' confirmation.")
     
     # Load dataset only once (data is the same across all replicates)
-    print("\n📁 Loading dataset...")
+    print("\n Loading dataset...")
     dataset = EfficientMicrofossilDataset(Config.DATA_DIR, max_samples_per_class=500)
     
     # Split dataset only once (fixed split for fair comparison across replicates)
@@ -532,7 +532,7 @@ def main():
     val_loader = DataLoader(val_dataset, batch_size=Config.BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
     test_loader = DataLoader(test_dataset, batch_size=Config.BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
     
-    print(f"✅ Dataset split: Train {len(train_dataset)}, Val {len(val_dataset)}, Test {len(test_dataset)}")
+    print(f" Dataset split: Train {len(train_dataset)}, Val {len(val_dataset)}, Test {len(test_dataset)}")
     
     # Save sample images (Original, Resized, Augmented) before starting the training loop
     save_sample_images(dataset, Config.OUTPUT_DIR) 
@@ -559,7 +559,7 @@ def main():
     # Final summary and results consolidation (across all replicates)
     if all_replicate_results:
         print(f"\n{'='*60}")
-        print(f"🏆 FINAL RESULTS SUMMARY ACROSS {Config.REPLICATES} REPLICATES")
+        print(f" FINAL RESULTS SUMMARY ACROSS {Config.REPLICATES} REPLICATES")
         print(f"{'='*60}")
         
         final_summary_data = []
@@ -591,17 +591,17 @@ def main():
             best_model_name = best_entry['Model']
             best_acc = float(best_entry['Mean Test Accuracy'])
 
-            print(f"\n🎯 BEST MODEL (Mean): {best_model_name} with {best_acc:.4f} accuracy")
+            print(f"\n BEST MODEL (Mean): {best_model_name} with {best_acc:.4f} accuracy")
             
             published_benchmark = 0.863
             if best_acc >= 0.90:
-                print("🎉 CONGRATULATIONS! ACHIEVED 90%+ MEAN ACCURACY! 🎉")
+                print(" CONGRATULATIONS! ACHIEVED 90%+ MEAN ACCURACY! 🎉")
             elif best_acc > published_benchmark:
-                print(f"✅ Better than original paper's best CNN result ({published_benchmark})!")
+                print(f" Better than original paper's best CNN result ({published_benchmark})!")
             else:
-                print("⚠️ Result below the published benchmark.")
+                print(" Result below the published benchmark.")
 
-        print(f"\n📁 All results saved to: {Config.OUTPUT_DIR}")
+        print(f"\n All results saved to: {Config.OUTPUT_DIR}")
         print("  - final_summary_all_replicates.csv: Comparative table of mean results across all replicates.")
         print("  - sample_images/: Sample images showing Original, Resized, and Augmented versions.")
         print("  - Replicate_X/: Individual folders for each run with model checkpoints and plots.")
