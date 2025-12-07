@@ -215,7 +215,7 @@ def load_model_safely(model_type="imagenet"):
             print(f" Loaded {loaded_params_count:,} parameters from {model_type}")
             
         except Exception as e:
-            print(f"⚠️ Could not load weights for {model_type}: {e}. Model will start from scratch/timm default.")
+            print(f" Could not load weights for {model_type}: {e}. Model will start from scratch/timm default.")
     
     return model.to(Config.DEVICE)
 
@@ -595,7 +595,7 @@ def main():
             
             published_benchmark = 0.863
             if best_acc >= 0.90:
-                print(" CONGRATULATIONS! ACHIEVED 90%+ MEAN ACCURACY! 🎉")
+                print(" CONGRATULATIONS! ACHIEVED 90%+ MEAN ACCURACY! ")
             elif best_acc > published_benchmark:
                 print(f" Better than original paper's best CNN result ({published_benchmark})!")
             else:
