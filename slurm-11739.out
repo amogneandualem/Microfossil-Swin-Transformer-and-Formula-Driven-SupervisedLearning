@@ -4,17 +4,17 @@ Starting training script at Sun 30 Nov 22:04:48 CST 2025
 Base Output Directory: ./swin_final_results_advanced
 Number of Replicates: 3
 Device: cuda
-📦 Batch size: 16
+Batch size: 16
 Epochs per experiment: 50
  Model: swin_base_patch4_window7_224
 ============================================================
 
 Loading dataset...
 Loaded 7287 images from 32 classes
-✅ Dataset split: Train 5829, Val 728, Test 730
+ Dataset split: Train 5829, Val 728, Test 730
 
-🖼️ Saving 5 sample images (Original vs. Resized/Augmented)...
-✅ Sample images saved in swin_final_results_advanced/sample_images/
+Saving 5 sample images (Original vs. Resized/Augmented)...
+Sample images saved in swin_final_results_advanced/sample_images/
 
 
 ==================== STARTING REPLICATE 1/3 ====================
@@ -1652,7 +1652,7 @@ exfractal    - Mean Val:  91.85%, Mean Test: 0.9041 (Std Dev: 0.0089)
 rcdb         - Mean Val:  86.49%, Mean Test: 0.8571 (Std Dev: 0.0112)
 
  BEST MODEL (Mean): exfractal with 0.9041 accuracy
- Run by Amogne Andualem! ACHIEVED 90%+ MEAN ACCURACY! 🎉
+ Run by Amogne Andualem! ACHIEVED 90%+ MEAN ACCURACY! 
 
  All results saved to: ./swin_final_results_advanced
   - final_summary_all_replicates.csv: Comparative table of mean results across all replicates.
