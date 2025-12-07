@@ -1,4 +1,6 @@
-### High-Fidelity Automated Paleontology: Swin Transformer architecture via Formula-Driven Supervised Pre-training for Enhanced Microfossil Classification
+### Advanced Automated Paleontology: Swin
+Transformer with Formula-Driven Pre-training for
+Microfossil Classification
 
 
 ## Project Overview
