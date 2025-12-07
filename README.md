@@ -56,19 +56,6 @@ ImageNet: 90.89% mean validation accuracy
 
 RCDB: 86.49% mean validation accuracy
 
-Repository Structure
-text
-swin_final_results_advanced/
-├── final_summary_all_replicates.csv     # Comparative results table
-├── sample_images/                       # Visualizations
-├── Replicate_1/                         # First experimental run
-│   ├── imagenet/                        # ImageNet pre-training results
-│   ├── exfractal/                       # ExFractal pre-training results  
-│   ├── rcdb/                            # RCDB pre-training results
-│   └── training_logs.txt                # Detailed training logs
-├── Replicate_2/                         # Second experimental run
-└── Replicate_3/                         # Third experimental run
-
 Swin Transformer Pre-training Comparison Study. 
 Experimental results comparing ImageNet, ExFractal, and RCDB pre-training.
 Available: [GitHub Repository URL]
