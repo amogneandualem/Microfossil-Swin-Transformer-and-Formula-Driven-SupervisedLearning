@@ -59,10 +59,10 @@ RCDB: 86.49% mean validation accuracy
 Swin Transformer Pre-training Comparison Study. 
 Experimental results comparing ImageNet, ExFractal, and RCDB pre-training.
 Available: [GitHub Repository URL]
-## 📊 Results and Models
+## Results and Models
 The best-performing model (e.g., the FDSL-trained Swin Transformer) is located in the `swin_final_results_advanced/Replicate_1/exfractal/best_model.pth` directory. Mean test accuracy achieved: [Insert Best Metric Here].
 
-## 📚 References
+##  References
 * [we will Link to our paper]
 * Swin Transformer: odels
 * Formula-Driven Supervised Learning (FDSL): we will link the paper soon
