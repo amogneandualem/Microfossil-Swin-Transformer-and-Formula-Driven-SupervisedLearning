@@ -5,11 +5,12 @@ from PIL import Image
 from torchvision import transforms
 import os
 
-# --- 1. CONFIGURATION ---
+# --- 1. CONFIGURATION (Must match your Training Config) ---
 MODEL_PATH = "swin_final_results_advanced/best_model.pth"
-# Corrected to Swin-Base to match your 1024-dimension weights
-MODEL_NAME = "swin_base_patch4_window7_224" 
+MODEL_NAME = "swin_base_patch4_window7_224" # Fixed size mismatch
+IMAGE_SIZE = 224
 
+# The 32 classes from your training script
 CLASSES = [
     'Acanthodesmia_micropora', 'Actinomma_leptoderma_boreale', 'Antarctissa_denticulata-cyrindrica', 
     'Antarctissa_juvenile', 'Antarctissa_longa-strelkovi', 'Botryocampe_antarctica', 
@@ -29,46 +30,47 @@ st.title("🔬 Microfossil Identification System")
 @st.cache_resource
 def load_model():
     try:
-        # Initialize Base architecture to solve the Size Mismatch
+        # Initialize Base architecture (1024-dim)
         model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=len(CLASSES))
         
         if os.path.exists(MODEL_PATH):
             checkpoint = torch.load(MODEL_PATH, map_location="cpu")
-            # Extract state_dict from trainer wrapper
+            
+            # Extract state_dict
             state_dict = checkpoint.get('model_state_dict', checkpoint)
-            model.load_state_dict(state_dict)
+            
+            # Clean "module." prefix if present from multi-GPU training
+            new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+            
+            # Load weights using strict=False to ignore metadata mismatches
+            model.load_state_dict(new_state_dict, strict=False)
             model.eval()
             return model, None
     except Exception as e:
         return None, str(e)
     return None, "Model file not found."
 
-model, error_msg = load_model()
-
-# Show error only if loading failed
-if error_msg and "not found" not in error_msg:
-    st.error(f"Error loading model: {error_msg}")
+model, error = load_model()
 
 # --- 3. INTERFACE ---
-# Radio buttons must exist for the camera option to show
 source = st.radio("Choose Input Method:", ("Upload Image File", "Use Camera"))
 
 img_data = None
 if source == "Upload Image File":
-    img_data = st.file_uploader("Select a microfossil image...", type=["jpg", "jpeg", "png"])
+    img_data = st.file_uploader("Select image...", type=["jpg", "jpeg", "png"])
 else:
-    # This triggers the browser camera request
-    img_data = st.camera_input("Capture a microscope sample")
+    img_data = st.camera_input("Capture specimen")
 
 if img_data is not None:
     image = Image.open(img_data).convert('RGB')
-    st.image(image, caption='Sample Preview', use_container_width=True)
+    st.image(image, caption='Specimen Preview', use_container_width=True)
     
     if st.button('🚀 Classify Specimen'):
         if model is not None:
-            with st.spinner('AI analysis in progress...'):
+            with st.spinner('Analyzing...'):
+                # Exact transforms from your training script
                 transform = transforms.Compose([
-                    transforms.Resize((224, 224)),
+                    transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
                     transforms.ToTensor(),
                     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
                 ])
@@ -79,8 +81,7 @@ if img_data is not None:
                     probs = torch.nn.functional.softmax(outputs, dim=1)
                     conf, idx = torch.max(probs, 1)
                 
-                label = CLASSES[idx.item()]
-                st.success(f"### Identification: **{label}**")
+                st.success(f"### Identification: **{CLASSES[idx.item()]}**")
                 st.info(f"**Confidence Score:** {conf.item()*100:.2f}%")
         else:
-            st.error("Cannot classify: Model is not loaded correctly.")
+            st.error(f"Model error: {error}")
