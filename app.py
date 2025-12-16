@@ -6,8 +6,11 @@ from torchvision import transforms
 import os
 
 # --- 1. CONFIGURATION ---
-# This path matches the folder name in your GitHub screenshot
+# The path matches your successful GitHub LFS upload
 MODEL_PATH = "swin_final_results_advanced/best_model.pth"
+
+# Model variant updated to 'base' to fix the size mismatch error
+MODEL_NAME = "swin_base_patch4_window7_224"
 
 CLASSES = [
     'Acanthodesmia_micropora', 'Actinomma_leptoderma_boreale', 'Antarctissa_denticulata-cyrindrica', 
@@ -15,31 +18,38 @@ CLASSES = [
     'Botryocampe_inflatum-conithorax', 'Ceratocyrtis_historicosus', 'Cycladophora_bicornis', 
     'Cycladophora_cornutoides', 'Cycladophora_davisiana', 'Diatoms', 'Druppatractus_irregularis-bensoni', 
     'Eucyrtidium_spp', 'Fragments', 'Larcids_inner', 'Lithocampe_furcaspiculate', 
-    'Lithomelissa_setosa-borealis', 'Lophophana_spp', 'Other_Nassellaria', 'Other_Spumellaria', 
-    'Phormospyris_stabilis_antarctica', 'Phorticym_clevei-pylonium', 'Plectacantha_oikiskos', 
-    'Pseudodictyophimus_gracilipes', 'Sethoconus_tablatus', 'Siphocampe_arachnea_group', 
-    'Spongodiscus', 'Spongurus_pylomaticus', 'Sylodictya_spp', 'Zygocircus'
+    'Lithocampe_platycephala', 'Lithomelissa_setosa-borealis', 'Lophophana_spp', 'Other_Nassellaria', 
+    'Other_Spumellaria', 'Phormospyris_stabilis_antarctica', 'Phorticym_clevei-pylonium', 
+    'Plectacantha_oikiskos', 'Pseudodictyophimus_gracilipes', 'Sethoconus_tablatus', 
+    'Siphocampe_arachnea_group', 'Spongodiscus', 'Spongurus_pylomaticus', 'Sylodictya_spp', 'Zygocircus'
 ]
 
 st.set_page_config(page_title="Microfossil PhD AI", layout="centered")
-st.title("🔬 Microfossil AI Identification")
+st.title("🔬 Microfossil Species Identification System")
 
 # --- 2. MODEL LOADING ---
 @st.cache_resource
 def load_model():
-    # Architecture: Swin-B
-    model = timm.create_model("swin_base_patch4_window7_224", pretrained=False, num_classes=32)
+    # Initialize the correct architecture to match weights
+    model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=len(CLASSES))
     
     if os.path.exists(MODEL_PATH):
         try:
-            # Use CPU for Streamlit hosting
+            # Loading to CPU for server compatibility
             checkpoint = torch.load(MODEL_PATH, map_location="cpu")
-            state_dict = checkpoint.get('model_state_dict', checkpoint.get('model', checkpoint))
+            
+            # Handle standard or trainer-wrapped state_dicts
+            if isinstance(checkpoint, dict):
+                state_dict = checkpoint.get('model_state_dict', checkpoint.get('model', checkpoint))
+            else:
+                state_dict = checkpoint
+                
             model.load_state_dict(state_dict, strict=False)
             model.eval()
             return model
         except Exception as e:
             st.error(f"Error loading model weights: {e}")
+            return None
     return None
 
 model = load_model()
@@ -53,14 +63,16 @@ if source == "Upload Image File":
 else:
     img_data = st.camera_input("Capture a microscope sample")
 
+# The interface logic ensures the button only shows if an image exists
 if img_data is not None:
     image = Image.open(img_data).convert('RGB')
     st.image(image, caption='Sample Preview', use_container_width=True)
     
-    # CLASSIFY BUTTON: Only appears after upload
+    # --- THE CLASSIFY BUTTON ---
     if st.button('🚀 Classify Specimen'):
         if model is not None:
-            with st.spinner('Analyzing specimen...'):
+            with st.spinner('AI analysis in progress...'):
+                # Standard Swin-B Preprocessing
                 transform = transforms.Compose([
                     transforms.Resize((224, 224)),
                     transforms.ToTensor(),
@@ -77,4 +89,4 @@ if img_data is not None:
                 st.success(f"### Identification: **{label}**")
                 st.info(f"**Confidence Score:** {conf.item()*100:.2f}%")
         else:
-            st.error("Model file not found. Check if the LFS push finished successfully.")
+            st.error("Model weights are missing or incorrect for the Swin-Base architecture.")
