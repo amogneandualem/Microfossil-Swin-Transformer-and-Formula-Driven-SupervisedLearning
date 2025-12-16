@@ -5,7 +5,8 @@ from PIL import Image
 from torchvision import transforms
 import os
 
-# Updated to match the path you just added to git
+# --- 1. CONFIGURATION ---
+# Path matches where you just committed the model
 MODEL_PATH = "Best results/exfractal/best_model.pth"
 CLASSES = [
     'Acanthodesmia_micropora', 'Actinomma_leptoderma_boreale', 'Antarctissa_denticulata-cyrindrica', 
@@ -19,43 +20,45 @@ CLASSES = [
     'Siphocampe_arachnea_group', 'Spongodiscus', 'Spongurus_pylomaticus', 'Sylodictya_spp', 'Zygocircus'
 ]
 
-st.set_page_config(page_title="Microfossil Identification", layout="wide")
+st.set_page_config(page_title="Microfossil PhD Research", layout="wide")
 st.title("🔬 Microfossil Species Identification System")
 
+# --- 2. MODEL LOADING ---
 @st.cache_resource
 def load_model():
-    # Initialize Swin-B architecture
     model = timm.create_model("swin_base_patch4_window7_224", pretrained=False, num_classes=32)
     if os.path.exists(MODEL_PATH):
-        checkpoint = torch.load(MODEL_PATH, map_location="cpu")
-        state_dict = checkpoint.get('model_state_dict', checkpoint.get('model', checkpoint))
-        model.load_state_dict(state_dict, strict=False)
-        model.eval()
-        return model
+        try:
+            checkpoint = torch.load(MODEL_PATH, map_location="cpu")
+            state_dict = checkpoint.get('model_state_dict', checkpoint.get('model', checkpoint))
+            model.load_state_dict(state_dict, strict=False)
+            model.eval()
+            return model
+        except Exception as e:
+            st.error(f"Error loading weights: {e}")
     return None
 
 model = load_model()
 
-# --- INTERFACE ---
+# --- 3. INTERFACE ---
 col1, col2 = st.columns(2)
 
 with col1:
-    source = st.radio("Input Source:", ("Upload Image", "Camera Capture"))
-    if source == "Upload Image":
-        img_file = st.file_uploader("Upload a fossil image", type=["jpg", "png", "jpeg"])
+    source = st.radio("Input Source:", ("Upload File", "Camera Capture"))
+    if source == "Upload File":
+        img_file = st.file_uploader("Upload microfossil image...", type=["jpg", "png", "jpeg"])
     else:
-        img_file = st.camera_input("Take a photo through the microscope")
+        img_file = st.camera_input("Take photo")
 
 with col2:
     if img_file is not None:
         image = Image.open(img_file).convert('RGB')
-        st.image(image, caption="Uploaded Specimen", use_container_width=True)
+        st.image(image, caption="Current Sample", use_container_width=True)
         
         # --- THE CLASSIFY BUTTON ---
-        # Only visible when an image is ready
-        if st.button('🚀 RUN AI CLASSIFICATION'):
+        if st.button('🚀 IDENTIFY SPECIES'):
             if model:
-                with st.spinner('Analyzing specimen...'):
+                with st.spinner('AI analyzing specimen...'):
                     preprocess = transforms.Compose([
                         transforms.Resize((224, 224)),
                         transforms.ToTensor(),
@@ -68,7 +71,7 @@ with col2:
                         prob = torch.nn.functional.softmax(output, dim=1)
                         conf, idx = torch.max(prob, 1)
                     
-                    st.success(f"### Result: {CLASSES[idx.item()]}")
-                    st.metric("Confidence", f"{conf.item()*100:.2f}%")
+                    st.success(f"### Identification: **{CLASSES[idx.item()]}**")
+                    st.metric("Confidence Score", f"{conf.item()*100:.2f}%")
             else:
-                st.error("Model not found. Please wait for the LFS upload to finish.")
+                st.error("Model file not found. Check GitHub LFS status.")
