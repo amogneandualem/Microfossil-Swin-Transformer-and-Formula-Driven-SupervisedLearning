@@ -7,7 +7,7 @@ from huggingface_hub import hf_hub_download
 
 # --- CONFIGURATION ---
 # Use your exact Hugging Face path here
-REPO_ID = "amogneandualem/microfossil-classifier" 
+REPO_ID = "https://huggingface.co/spaces/amogneandualem/microfossil-classifier/resolve/main/best_model.pth 
 FILENAME = "best_model.pth"
 
 st.set_page_config(page_title="Microfossil ID", page_icon="🔬")
