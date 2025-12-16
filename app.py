@@ -6,7 +6,7 @@ from torchvision import transforms
 import os
 
 # ==================== CONFIGURATION ====================
-# REQUIRED: Swin-Base matches the 1024-dim layers in your error log
+# Swin-Base is REQUIRED to match the 1024-dim layers in your checkpoint
 MODEL_NAME = "swin_base_patch4_window7_224" 
 NUM_CLASSES = 32
 IMAGE_SIZE = 224
@@ -24,8 +24,18 @@ CLASSES = [
     'Siphocampe_arachnea_group', 'Spongodiscus', 'Spongurus_pylomaticus', 'Sylodictya_spp', 'Zygocircus'
 ]
 
-st.set_page_config(page_title="Microfossil Identification", layout="centered")
+st.set_page_config(page_title="Microfossil PhD AI", layout="centered")
 st.title("🔬 Microfossil Identification System")
+
+# ==================== DEBUGGING SECTION ====================
+with st.expander("📂 View Repository File Structure (Check for 332MB File)"):
+    all_files = []
+    for root, dirs, files in os.walk("."):
+        for file in files:
+            path = os.path.join(root, file)
+            size = os.path.getsize(path) / (1024 * 1024)
+            all_files.append(f"{path} ({size:.2f} MB)")
+    st.write(all_files)
 
 # ==================== ROBUST MODEL LOADING ====================
 @st.cache_resource
@@ -33,7 +43,7 @@ def load_model():
     target_file = "best_model.pth"
     model_path = None
     
-    # 1. Search every subfolder for the file
+    # 1. Search every folder for the file
     for root, dirs, files in os.walk("."):
         if target_file in files:
             temp_path = os.path.join(root, target_file)
@@ -43,15 +53,10 @@ def load_model():
                 break
 
     if not model_path:
-        # Check if the file exists but is just a tiny LFS pointer
-        for root, dirs, files in os.walk("."):
-            if target_file in files:
-                size_kb = os.path.getsize(os.path.join(root, target_file)) / 1024
-                return None, f"LFS Sync Error: Found {target_file} but it is only {size_kb:.2f}KB. Ensure you pushed the actual 332MB file from your PC terminal."
-        return None, "best_model.pth not found in any folder. Check your GitHub repository."
+        return None, "best_model.pth not found or is a small pointer file (<100MB). Check LFS status."
 
     try:
-        # 3. Initialize Swin-Base to fix the size mismatch error
+        # 3. Initialize Swin-Base to fix size mismatch (1024-dim)
         model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
         
         # 4. Load weights onto CPU
@@ -65,7 +70,7 @@ def load_model():
         model.eval()
         return model, f"Successfully loaded from: {model_path}"
     except Exception as e:
-        return None, f"Error initializing model: {str(e)}"
+        return None, f"Error: {str(e)}"
 
 model, status = load_model()
 
@@ -73,8 +78,6 @@ model, status = load_model()
 if not model:
     st.error(f"🚨 Setup Error: {status}")
     st.info("Note: Large models (332MB) take 5-10 minutes to sync on Streamlit Cloud.")
-    if st.button("🔄 Reload App"):
-        st.rerun()
 else:
     st.success(f"✅ AI Online | {status}")
     
@@ -83,8 +86,8 @@ else:
         image = Image.open(img_file).convert('RGB')
         st.image(image, caption="Uploaded Specimen", use_container_width=True)
         
-        if st.button("🚀 Run Identification"):
-            # Normalization parameters must match your training script
+        if st.button("🚀 Identify Microfossil"):
+            # Transformation parameters from your training logic
             transform = transforms.Compose([
                 transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
                 transforms.ToTensor(),
