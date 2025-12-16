@@ -1,24 +1,30 @@
 """
-Microfossil Classifier - Streamlit Cloud Compatible
-Simplified version that works on Streamlit Cloud
+Microfossil Classifier - Streamlit Cloud
+Downloads model from Hugging Face on first run
 """
 
 import streamlit as st
 import torch
 from torchvision import transforms
 from PIL import Image
-import numpy as np
 import os
+import requests
 import time
+from tqdm import tqdm
+import numpy as np
 
-# ========== PAGE CONFIG ==========
+# ========== CONFIGURATION ==========
 st.set_page_config(
     page_title="Microfossil Classifier",
     page_icon="🔬",
-    layout="centered"
+    layout="wide"
 )
 
-# ========== CONSTANTS ==========
+# Your Hugging Face Space URL
+HUGGINGFACE_MODEL_URL = "https://huggingface.co/spaces/amogneandualem/microfossil-classifier/resolve/main/model.pth"
+MODEL_PATH = "model.pth"
+
+# Class names (32 classes)
 CLASS_NAMES = [
     'Acanthodesmia_micropora', 'Actinomma_leptoderma_boreale',
     'Antarctissa_denticulata-cyrindrica', 'Antarctissa_juvenile',
@@ -37,15 +43,74 @@ CLASS_NAMES = [
     'Sylodictya_spp', 'Zygocircus'
 ]
 
-# ========== SIMPLE MODEL LOADER ==========
+# ========== DOWNLOAD MODEL FROM HUGGING FACE ==========
+@st.cache_resource
+def download_model():
+    """Download model from Hugging Face with progress bar"""
+    if os.path.exists(MODEL_PATH):
+        st.success(f"✅ Model already downloaded: {os.path.getsize(MODEL_PATH)/1024/1024:.1f} MB")
+        return MODEL_PATH
+    
+    st.warning("⚠️ Model not found. Downloading from Hugging Face...")
+    
+    try:
+        # Start download
+        response = requests.get(HUGGINGFACE_MODEL_URL, stream=True)
+        response.raise_for_status()
+        
+        # Get file size
+        total_size = int(response.headers.get('content-length', 0))
+        st.info(f"📥 Downloading {total_size/1024/1024:.1f} MB model...")
+        
+        # Download with progress bar
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        with open(MODEL_PATH, 'wb') as f:
+            downloaded = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    
+                    # Update progress
+                    progress = downloaded / total_size
+                    progress_bar.progress(min(progress, 1.0))
+                    
+                    # Update status
+                    mb_downloaded = downloaded / 1024 / 1024
+                    mb_total = total_size / 1024 / 1024
+                    status_text.text(f"Downloaded: {mb_downloaded:.1f} / {mb_total:.1f} MB")
+        
+        progress_bar.empty()
+        status_text.empty()
+        
+        if os.path.exists(MODEL_PATH):
+            file_size = os.path.getsize(MODEL_PATH) / 1024 / 1024
+            st.success(f"✅ Model downloaded successfully! ({file_size:.1f} MB)")
+            return MODEL_PATH
+        else:
+            st.error("❌ Download failed - file not created")
+            return None
+            
+    except Exception as e:
+        st.error(f"❌ Download failed: {str(e)}")
+        return None
+
+# ========== LOAD MODEL ==========
 @st.cache_resource
 def load_model():
-    """Load model with fallbacks for compatibility"""
+    """Load the PyTorch model"""
     try:
-        # Try to import timm
+        # First download the model
+        model_path = download_model()
+        if not model_path:
+            return None
+        
+        # Import timm only when needed (to avoid installation issues)
         import timm
         
-        # Create model
+        # Create model - SWIN LARGE (your model is Large, not Base)
         model = timm.create_model(
             "swin_large_patch4_window7_224",
             pretrained=False,
@@ -53,11 +118,16 @@ def load_model():
         )
         
         # Load checkpoint
-        checkpoint = torch.load("model.pth", map_location='cpu')
+        checkpoint = torch.load(model_path, map_location='cpu')
         
         # Extract state dict
         if isinstance(checkpoint, dict):
-            state_dict = checkpoint.get('model_state_dict', checkpoint)
+            if 'model_state_dict' in checkpoint:
+                state_dict = checkpoint['model_state_dict']
+            elif 'state_dict' in checkpoint:
+                state_dict = checkpoint['state_dict']
+            else:
+                state_dict = checkpoint
         else:
             state_dict = checkpoint
         
@@ -65,7 +135,7 @@ def load_model():
         cleaned_state_dict = {}
         for k, v in state_dict.items():
             if k.startswith('module.'):
-                k = k[7:]
+                k = k[7:]  # Remove DataParallel prefix
             cleaned_state_dict[k] = v
         
         # Load weights
@@ -75,49 +145,62 @@ def load_model():
         return model
         
     except Exception as e:
-        st.error(f"Model loading error: {str(e)[:200]}")
+        st.error(f"❌ Model loading failed: {str(e)[:200]}")
         return None
 
 # ========== MAIN APP ==========
 def main():
     st.title("🔬 Microfossil Classifier")
-    st.markdown("**AI-powered classification of microfossil images**")
+    st.markdown("**Model hosted on Hugging Face | 32 Classes | AI-Powered**")
     
-    # Check if model exists
-    if os.path.exists("model.pth"):
-        st.success("✅ Model file found")
-    else:
-        st.warning("⚠️ Model file not found - running in demo mode")
-        st.info("Please upload model.pth to your GitHub repository")
+    # Sidebar
+    with st.sidebar:
+        st.title("⚙️ Settings")
+        
+        # Model status
+        if st.button("🔄 Check Model"):
+            model_path = download_model()
+            if model_path:
+                size = os.path.getsize(model_path) / 1024 / 1024
+                st.success(f"Model: {size:.1f} MB")
+        
+        # About
+        with st.expander("ℹ️ About"):
+            st.write("""
+            **How it works:**
+            1. App downloads model from Hugging Face (349MB)
+            2. First download takes 2-3 minutes
+            3. Subsequent runs use cached model
+            4. Upload images for classification
+            
+            **Model Details:**
+            - Swin-Large Transformer
+            - 32 microfossil classes
+            - Trained on microfossil dataset
+            """)
     
     # Two columns layout
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([1, 1])
     
     with col1:
         st.subheader("📤 Upload Image")
+        
         uploaded_file = st.file_uploader(
-            "Choose an image",
-            type=['jpg', 'png', 'jpeg']
+            "Choose a microfossil image",
+            type=['jpg', 'jpeg', 'png'],
+            help="Supported formats: JPG, PNG"
         )
         
         if uploaded_file:
             image = Image.open(uploaded_file)
             st.image(image, caption="Your image", use_container_width=True)
-            
-            # Show file info
-            with st.expander("📊 Image Details"):
-                st.write(f"**Name:** {uploaded_file.name}")
-                st.write(f"**Size:** {uploaded_file.size / 1024:.1f} KB")
-                st.write(f"**Dimensions:** {image.size}")
-                st.write(f"**Format:** {image.format}")
     
     with col2:
         st.subheader("🔍 Analysis")
         
         if uploaded_file:
             if st.button("🚀 Classify", type="primary"):
-                with st.spinner("Processing..."):
-                    # Load model
+                with st.spinner("Loading model..."):
                     model = load_model()
                     
                     if model:
@@ -125,7 +208,7 @@ def main():
                         transform = transforms.Compose([
                             transforms.Resize((224, 224)),
                             transforms.ToTensor(),
-                            transforms.Normalize([0.485, 0.456, 0.406], 
+                            transforms.Normalize([0.485, 0.456, 0.406],
                                                [0.229, 0.224, 0.225])
                         ])
                         
@@ -137,10 +220,10 @@ def main():
                             probs = torch.nn.functional.softmax(outputs, dim=1)
                             top_prob, top_idx = torch.max(probs, 1)
                         
-                        # Display results
+                        # Show results
                         idx = top_idx.item()
                         if idx < len(CLASS_NAMES):
-                            st.success(f"🎯 **{CLASS_NAMES[idx]}**")
+                            st.success(f"🎯 **Prediction:** {CLASS_NAMES[idx]}")
                             st.metric("Confidence", f"{top_prob.item()*100:.1f}%")
                             
                             # Show top 5
@@ -154,9 +237,7 @@ def main():
                         else:
                             st.error("Prediction index out of range")
                     else:
-                        st.warning("Model not loaded - showing demo results")
-                        st.info("**Demo prediction:** Actinomma_leptoderma_boreale")
-                        st.info("**Confidence:** 92.5%")
+                        st.warning("Model not loaded. Please check download.")
         else:
             st.info("👆 Upload an image to begin")
             
@@ -165,15 +246,14 @@ def main():
                 st.write("""
                 1. **Upload** a microfossil image
                 2. Click **"Classify"** button
-                3. View **AI prediction** with confidence
-                4. See **top 5** possible classifications
-                
-                **Note:** Model must be uploaded as `model.pth` in the repository.
+                3. **First time:** Model downloads (2-3 minutes)
+                4. View **AI predictions** with confidence
+                5. See **top 5** classifications
                 """)
     
     # Footer
     st.markdown("---")
-    st.caption("Deployed on Streamlit Cloud | Built with PyTorch")
+    st.caption("Model hosted on Hugging Face | Deployed on Streamlit Cloud")
 
 if __name__ == "__main__":
     main()
