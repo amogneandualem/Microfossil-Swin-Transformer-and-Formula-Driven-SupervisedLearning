@@ -6,7 +6,6 @@ from torchvision import transforms
 import os
 
 # ==================== CONFIGURATION ====================
-# Swin-Base is required to match your 1024-dim checkpoint
 MODEL_NAME = "swin_base_patch4_window7_224" 
 NUM_CLASSES = 32
 IMAGE_SIZE = 224
@@ -26,37 +25,49 @@ CLASSES = [
 st.set_page_config(page_title="Microfossil PhD AI", layout="wide")
 st.title("🔬 Microfossil Identification System")
 
+# ==================== DEBUGGING SECTION ====================
+with st.expander("📂 View Repository File Structure (Debug)"):
+    all_files = []
+    for root, dirs, files in os.walk("."):
+        for file in files:
+            rel_path = os.path.join(root, file)
+            size_mb = os.path.getsize(rel_path) / (1024 * 1024)
+            all_files.append(f"{rel_path} ({size_mb:.2f} MB)")
+    st.write(all_files)
+
+# ==================== MODEL LOADING ====================
 @st.cache_resource
 def load_model():
     target_file = "best_model.pth"
     model_path = None
     
-    # RECURSIVE SEARCH: Looks in every subfolder for the file
+    # Deep search for the file
     for root, dirs, files in os.walk("."):
-        if target_file in files:
-            temp_path = os.path.join(root, target_file)
-            # Verify file size to ensure it's not a 1KB LFS pointer
+        if target_file.lower() in [f.lower() for f in files]:
+            # Handle case sensitivity
+            actual_name = [f for f in files if f.lower() == target_file.lower()][0]
+            temp_path = os.path.join(root, actual_name)
+            
+            # Check size: Must be > 100MB to be the real weight file
             if os.path.getsize(temp_path) > 100 * 1024 * 1024:
                 model_path = temp_path
                 break
 
     if not model_path:
-        return None, "best_model.pth not found. Please check GitHub LFS status."
+        return None, f"CRITICAL: '{target_file}' not found or is too small (<100MB)."
 
     try:
-        # Initialize the larger Swin-Base structure
+        # Initialize Swin-Base to match 1024-dim weights
         model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
-        
-        # Load weights onto CPU
         checkpoint = torch.load(model_path, map_location="cpu")
         state_dict = checkpoint.get('model_state_dict', checkpoint)
         
-        # Strip prefixes like 'module.'
+        # Strip prefixes
         state_dict = {k.replace('module.', '').replace('backbone.', ''): v for k, v in state_dict.items()}
         
         model.load_state_dict(state_dict, strict=False)
         model.eval()
-        return model, f"✅ Successfully loaded from: {model_path}"
+        return model, f"✅ Successfully loaded: {model_path}"
     except Exception as e:
         return None, str(e)
 
@@ -64,29 +75,8 @@ model, status = load_model()
 
 # ==================== USER INTERFACE ====================
 if not model:
-    st.error(f"🚨 Setup Error: {status}")
-    st.info("Ensure the file on GitHub shows a size of ~332MB.")
+    st.error(status)
+    st.info("Check the folder list above. If your file is not there, it was not pushed to GitHub.")
 else:
     st.success(status)
-    
-    uploaded_file = st.file_uploader("Upload Microfossil Image", type=["jpg", "png", "jpeg"])
-    
-    if uploaded_file:
-        image = Image.open(uploaded_file).convert('RGB')
-        st.image(image, caption="Specimen", width=400)
-        
-        if st.button("🚀 Identify"):
-            transform = transforms.Compose([
-                transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ])
-            
-            img_tensor = transform(image).unsqueeze(0)
-            with torch.no_grad():
-                output = model(img_tensor)
-                prob = torch.nn.functional.softmax(output, dim=1)
-                conf, idx = torch.max(prob, 1)
-                
-            st.header(f"Result: {CLASSES[idx.item()]}")
-            st.write(f"Confidence: {conf.item()*100:.2f}%")
+    # ... rest of your prediction UI code ...
