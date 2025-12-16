@@ -6,7 +6,7 @@ from torchvision import transforms
 import os
 
 # ==================== CONFIGURATION ====================
-# Matches your provided training script
+# Architecture MUST be 'base' to match your 1024-dim weights
 MODEL_NAME = "swin_base_patch4_window7_224" 
 NUM_CLASSES = 32
 IMAGE_SIZE = 224
@@ -30,34 +30,35 @@ st.title("🔬 Microfossil Identification System")
 # ==================== MODEL LOADING ====================
 @st.cache_resource
 def load_model():
-    # Force Swin-Base architecture to match 1024-dim weights
+    # Initialize the correct model structure
     model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
     
-    # Confirmed path from your GitHub folder structure
+    # Path confirmed from your GitHub screenshot
     model_path = "swin_final_results_advanced/best_model.pth"
 
     if os.path.exists(model_path):
         try:
+            # Load the checkpoint and extract weights
             checkpoint = torch.load(model_path, map_location="cpu")
-            # Extract state_dict (handles trainer wrappers)
             state_dict = checkpoint.get('model_state_dict', checkpoint)
             
-            # Remove 'module.' prefix if it exists from training
+            # Clean up key names for compatibility
             state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
             
-            # Use strict=False to bypass minor naming variations in timm layers
+            # Load weights (strict=False handles minor timm naming variations)
             model.load_state_dict(state_dict, strict=False)
             model.eval()
             return model, None
         except Exception as e:
             return None, str(e)
-    return None, "Model file not found."
+    return None, f"Searching for file at: {os.path.abspath(model_path)}"
 
 model, error = load_model()
 
 # ==================== USER INTERFACE ====================
 if error:
-    st.error(f"🚨 System Error: {error}")
+    st.error(f"🚨 Model Error: {error}")
+    st.info("Ensure the folder 'swin_final_results_advanced' exists in your GitHub root.")
 
 source = st.radio("Choose Input Method:", ("Upload Image File", "Use Camera"))
 img_buffer = st.file_uploader("Select JPG/PNG", type=["jpg", "png", "jpeg"]) if source == "Upload Image File" else st.camera_input("Capture")
@@ -69,7 +70,7 @@ if img_buffer:
     if st.button("🚀 Run AI Classification"):
         if model:
             with st.spinner('Analyzing specimen...'):
-                # Matches your eval_transform in training
+                # Matches your eval_transform logic
                 preprocess = transforms.Compose([
                     transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
                     transforms.ToTensor(),
@@ -85,4 +86,4 @@ if img_buffer:
                 st.success(f"### Identification: **{CLASSES[index.item()]}**")
                 st.info(f"**Confidence Score:** {confidence.item()*100:.2f}%")
         else:
-            st.error("Model not ready.")
+            st.error("Model is not loaded. Check the path error above.")
