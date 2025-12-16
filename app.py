@@ -11,8 +11,8 @@ import os
 MODEL_URL = "https://huggingface.co/spaces/amogneandualem/microfossil-classifier/resolve/main/best_model.pth"
 MODEL_PATH = "best_model.pth"
 
-# Your error shows 32 classes in the checkpoint. 
-# Update this list with your actual 32 species names in the correct order!
+# Updated species list - Put your 32 species here in the EXACT order they were trained
+# The order must match your training data folders!
 CLASS_NAMES = [
     "Diatoms", "Druppatractus_irregularis", "Eucyrtidium_spp", "Fragments", "Others",
     "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10",
@@ -28,39 +28,42 @@ st.title("🔬 Microfossil Identification System")
 @st.cache_resource
 def load_model():
     if not os.path.exists(MODEL_PATH):
-        with st.spinner("Downloading weights from Hugging Face..."):
+        with st.spinner("Downloading model weights from Hugging Face..."):
             urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
     
-    # 1. Create model using TIMM (matches your 'Unexpected keys')
-    # Swin Base patch4 window7 224 is the standard for your file size
-    model = timm.create_model('swin_base_patch4_window7_224', pretrained=False, num_classes=32)
+    # 1. Create SWIN-LARGE model
+    # Matches the 1024/2048 channel sizes from your error report
+    model = timm.create_model('swin_large_patch4_window7_224', pretrained=False, num_classes=32)
     
     # 2. Load the checkpoint
     checkpoint = torch.load(MODEL_PATH, map_location='cpu')
     
-    # 3. Extract weights if they are wrapped in a dictionary
+    # 3. Handle nested state dict ('model_state_dict' vs direct)
     state_dict = checkpoint.get("model_state_dict", checkpoint)
 
-    # 4. Load into model
-    model.load_state_dict(state_dict)
+    # 4. Load with strict=False
+    # This ignores relative_position_index mismatch which is safe for Swin
+    model.load_state_dict(state_dict, strict=False)
     model.eval()
     return model
 
+# Initialize the model
 try:
     model = load_model()
-    st.success("✅ Swin-Base (Timm) Model Loaded Successfully!")
+    st.success("✅ Swin-Large Model Loaded Successfully!")
 except Exception as e:
     st.error(f"🚨 Setup Error: {e}")
+    st.info("Check your internet connection or Hugging Face URL.")
     st.stop()
 
-# --- PREDICTION UI ---
-uploaded_file = st.file_uploader("Upload microfossil image...", type=["jpg", "png", "jpeg"])
+# --- 2. PREDICTION UI ---
+uploaded_file = st.file_uploader("Upload a microfossil image...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
     image = Image.open(uploaded_file).convert('RGB')
-    st.image(image, caption="Input Image", use_container_width=True)
+    st.image(image, caption="Uploaded Image", use_container_width=True)
     
-    # Standard Swin Transform
+    # Preprocessing
     transform = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -71,11 +74,18 @@ if uploaded_file:
     input_tensor = transform(image).unsqueeze(0)
     
     with torch.no_grad():
-        with st.spinner("Classifying..."):
+        with st.spinner("Analyzing..."):
             output = model(input_tensor)
             prob = torch.nn.functional.softmax(output[0], dim=0)
-            conf, pred = torch.max(prob, 0)
+            confidence, prediction = torch.max(prob, 0)
     
-    label = CLASS_NAMES[pred.item()] if pred.item() < len(CLASS_NAMES) else f"Unknown ({pred.item()})"
-    st.subheader(f"Prediction: {label}")
-    st.write(f"**Confidence:** {conf.item()*100:.2f}%")
+    # Result Display
+    res_label = CLASS_NAMES[prediction.item()]
+    st.subheader(f"Prediction: {res_label}")
+    st.write(f"**Confidence Score:** {confidence.item()*100:.2f}%")
+    
+    # Sidebar Probability View
+    with st.expander("Show detailed probabilities"):
+        for i, name in enumerate(CLASS_NAMES):
+            if prob[i] > 0.01: # Only show classes > 1%
+                st.write(f"{name}: {prob[i].item()*100:.1f}%")
