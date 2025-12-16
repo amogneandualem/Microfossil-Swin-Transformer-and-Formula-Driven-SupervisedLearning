@@ -6,12 +6,11 @@ from torchvision import transforms
 import os
 import time
 
-# ==================== CONFIGURATION ====================
-# MUST match your training script config
+# --- CONFIGURATION (Matches your training script) ---
+# This MUST be swin_base to handle the 1024/2048 dim weights
 MODEL_NAME = "swin_base_patch4_window7_224" 
 NUM_CLASSES = 32
 IMAGE_SIZE = 224
-# Path from your GitHub screenshot
 MODEL_PATH = "swin_final_results_advanced/best_model.pth"
 
 CLASSES = [
@@ -29,32 +28,26 @@ CLASSES = [
 st.set_page_config(page_title="Microfossil PhD AI", layout="centered")
 st.title("🔬 Microfossil Identification System")
 
-# ==================== ROBUST MODEL LOADING ====================
 @st.cache_resource
 def load_model():
-    # 1. Wait for Git LFS if the file is too small (pointer file)
-    max_retries = 5
-    for i in range(max_retries):
-        if os.path.exists(MODEL_PATH):
-            file_size = os.path.getsize(MODEL_PATH)
-            if file_size > 100000000: # Ensure file is > 100MB
-                break
-        st.warning(f"⏳ Waiting for model weights to download via Git LFS (Attempt {i+1}/{max_retries})...")
+    # Wait for Git LFS download if the file is just a 1KB pointer
+    if os.path.exists(MODEL_PATH) and os.path.getsize(MODEL_PATH) < 1000000:
+        st.info("⏳ Git LFS is still downloading the large model file. Please wait...")
         time.sleep(10)
-    
-    if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 100000000:
-        return None, "Model file not found or incomplete. Please wait 5 minutes and refresh."
+        st.rerun()
 
     try:
-        # 2. Initialize Swin-Base (Matches 1024-dim weights)
+        # 1. Create the BASE model structure
         model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
         
+        # 2. Load the checkpoint
         checkpoint = torch.load(MODEL_PATH, map_location="cpu")
         state_dict = checkpoint.get('model_state_dict', checkpoint)
         
-        # 3. Clean keys from training wrappers
+        # 3. Clean 'module.' prefixes
         state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
         
+        # 4. Load weights (strict=False handles minor timm version differences)
         model.load_state_dict(state_dict, strict=False)
         model.eval()
         return model, None
@@ -63,21 +56,18 @@ def load_model():
 
 model, error = load_model()
 
-# ==================== UI LOGIC ====================
 if error:
-    st.error(f"🚨 {error}")
+    st.error(f"🚨 Architecture Mismatch or File Error: {error}")
     st.stop()
 
-st.success("✅ AI Model Loaded Successfully (Swin-Base)")
-
-uploaded_file = st.file_uploader("Upload Microfossil Image", type=["jpg", "png", "jpeg"])
+# --- UI LOGIC ---
+uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
     image = Image.open(uploaded_file).convert('RGB')
-    st.image(image, caption="Specimen", use_container_width=True)
+    st.image(image, caption="Specimen Preview", use_container_width=True)
     
     if st.button("🚀 Identify"):
-        # Preprocessing matches your training script exactly
         transform = transforms.Compose([
             transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
             transforms.ToTensor(),
@@ -87,8 +77,6 @@ if uploaded_file:
         img_tensor = transform(image).unsqueeze(0)
         with torch.no_grad():
             output = model(img_tensor)
-            prob = torch.nn.functional.softmax(output, dim=1)
-            conf, idx = torch.max(prob, 1)
+            idx = torch.argmax(output, 1).item()
             
-        st.header(f"Result: {CLASSES[idx.item()]}")
-        st.write(f"Confidence: {conf.item()*100:.2f}%")
+        st.success(f"### Identification: **{CLASSES[idx]}**")
