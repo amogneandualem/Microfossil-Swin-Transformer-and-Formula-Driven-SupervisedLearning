@@ -4,17 +4,15 @@ import timm
 from PIL import Image
 from torchvision import transforms
 import os
+import time
 
 # ==================== CONFIGURATION ====================
-# Force Swin-Base to match the 1024/2048-dim weights in your error log
+# Force Swin-Base to match your 1024/2048-dim weights
 MODEL_NAME = "swin_base_patch4_window7_224" 
 NUM_CLASSES = 32
 IMAGE_SIZE = 224
 
-# Exact path based on your GitHub folder structure
-MODEL_PATH = "swin_final_results_advanced/best_model.pth"
-
-# Exact class list for your microfossil dataset
+# The exact 32 classes from your dataset
 CLASSES = [
     'Acanthodesmia_micropora', 'Actinomma_leptoderma_boreale', 'Antarctissa_denticulata-cyrindrica', 
     'Antarctissa_juvenile', 'Antarctissa_longa-strelkovi', 'Botryocampe_antarctica', 
@@ -30,31 +28,39 @@ CLASSES = [
 st.set_page_config(page_title="Microfossil PhD AI", layout="wide")
 st.title("🔬 Microfossil Identification System")
 
-# ==================== MODEL LOADING ====================
+# ==================== ROBUST MODEL LOADING ====================
 @st.cache_resource
 def load_model():
-    # 1. Check if file exists and isn't just an LFS pointer
-    if not os.path.exists(MODEL_PATH):
-        return None, f"File not found at {MODEL_PATH}. Check your folder structure."
+    # 1. SEARCH FOR THE FILE REGARDLESS OF FOLDER
+    target_filename = "best_model.pth"
+    model_path = None
     
-    if os.path.getsize(MODEL_PATH) < 1000000:
-        return None, "Git LFS Error: File is a 1KB pointer. Wait for download."
+    for root, dirs, files in os.walk("."):
+        if target_filename in files:
+            found_path = os.path.join(root, target_filename)
+            # Ensure it is the real 332MB file, not a 1KB LFS pointer
+            if os.path.getsize(found_path) > 100 * 1024 * 1024: 
+                model_path = found_path
+                break
+    
+    if not model_path:
+        return None, "best_model.pth not found or still downloading via Git LFS."
 
     try:
-        # 2. Initialize the LARGER Swin-Base model structure
+        # 2. INITIALIZE BASE ARCHITECTURE
         model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
         
-        # 3. Load weights onto CPU for Streamlit Cloud
-        checkpoint = torch.load(MODEL_PATH, map_location="cpu")
+        # 3. LOAD WEIGHTS
+        checkpoint = torch.load(model_path, map_location="cpu")
         state_dict = checkpoint.get('model_state_dict', checkpoint)
         
-        # 4. Remove 'module.' prefixes from DataParallel training
-        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+        # Clean training prefixes
+        state_dict = {k.replace('module.', '').replace('backbone.', ''): v for k, v in state_dict.items()}
         
-        # 5. Load with strict=False to handle minor naming differences
+        # 4. Apply weights with strict=False to bypass naming variations
         model.load_state_dict(state_dict, strict=False)
         model.eval()
-        return model, "Model Ready"
+        return model, f"Successfully loaded from: {model_path}"
     except Exception as e:
         return None, str(e)
 
@@ -63,18 +69,20 @@ model, status = load_model()
 # ==================== USER INTERFACE ====================
 if model is None:
     st.error(f"🚨 Model Error: {status}")
-    if st.button("🔄 Reload App"):
+    st.info("Large files can take 5+ minutes to sync on Streamlit Cloud. Please wait.")
+    if st.button("🔄 Refresh System"):
         st.rerun()
 else:
-    st.success("✅ AI Model Loaded (Swin-Base)")
-    
+    st.success(f"✅ AI System Online | {status}")
+
     img_file = st.file_uploader("Upload Microfossil Image", type=["jpg", "png", "jpeg"])
     
     if img_file:
         image = Image.open(img_file).convert('RGB')
-        st.image(image, caption="Current Specimen", use_container_width=True)
+        st.image(image, caption="Specimen Preview", use_container_width=True)
         
         if st.button("🚀 Run AI Classification"):
+            # Preprocessing matches your training script exactly
             preprocess = transforms.Compose([
                 transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
                 transforms.ToTensor(),
@@ -88,5 +96,5 @@ else:
                 probs = torch.nn.functional.softmax(logits, dim=1)
                 confidence, index = torch.max(probs, 1)
             
-            st.markdown(f"## Identification: **{CLASSES[index.item()]}**")
-            st.info(f"Confidence Score: {confidence.item()*100:.2f}%")
+            st.markdown(f"## Result: **{CLASSES[index.item()]}**")
+            st.info(f"Confidence Level: {confidence.item()*100:.2f}%")
