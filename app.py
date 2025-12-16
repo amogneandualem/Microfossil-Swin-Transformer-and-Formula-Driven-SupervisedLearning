@@ -5,12 +5,12 @@ from PIL import Image
 from torchvision import transforms
 import os
 
-# --- 1. CONFIGURATION (Must match your Training Config) ---
+# --- 1. CONFIGURATION ---
+# This path must match your GitHub folder structure exactly
 MODEL_PATH = "swin_final_results_advanced/best_model.pth"
-MODEL_NAME = "swin_base_patch4_window7_224" # Fixed size mismatch
+MODEL_NAME = "swin_base_patch4_window7_224" # Matches Swin-Base (1024-dim)
 IMAGE_SIZE = 224
 
-# The 32 classes from your training script
 CLASSES = [
     'Acanthodesmia_micropora', 'Actinomma_leptoderma_boreale', 'Antarctissa_denticulata-cyrindrica', 
     'Antarctissa_juvenile', 'Antarctissa_longa-strelkovi', 'Botryocampe_antarctica', 
@@ -26,40 +26,54 @@ CLASSES = [
 st.set_page_config(page_title="Microfossil PhD AI", layout="centered")
 st.title("🔬 Microfossil Identification System")
 
-# --- 2. MODEL LOADING ---
+# --- 2. DEBUGGING / FILE SEARCHER ---
+# This helps find the file if the path is slightly wrong on the server
+if not os.path.exists(MODEL_PATH):
+    st.warning(f"Searching for model file... (Not found at {MODEL_PATH})")
+    for root, dirs, files in os.walk("."):
+        for file in files:
+            if file == "best_model.pth":
+                MODEL_PATH = os.path.join(root, file)
+                st.success(f"✅ Found model at: {MODEL_PATH}")
+
+# --- 3. MODEL LOADING ---
 @st.cache_resource
-def load_model():
+def load_model(path):
     try:
-        # Initialize Base architecture (1024-dim)
+        # Initialize Swin-Base architecture
         model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=len(CLASSES))
         
-        if os.path.exists(MODEL_PATH):
-            checkpoint = torch.load(MODEL_PATH, map_location="cpu")
+        if os.path.exists(path):
+            checkpoint = torch.load(path, map_location="cpu")
             
-            # Extract state_dict
+            # Extract state_dict (handles your specific trainer format)
             state_dict = checkpoint.get('model_state_dict', checkpoint)
             
-            # Clean "module." prefix if present from multi-GPU training
+            # Clean "module." prefix from multi-GPU training
             new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
             
-            # Load weights using strict=False to ignore metadata mismatches
+            # Load weights (strict=False ignores non-essential metadata)
             model.load_state_dict(new_state_dict, strict=False)
             model.eval()
             return model, None
+        return None, "File still not found after search."
     except Exception as e:
         return None, str(e)
-    return None, "Model file not found."
 
-model, error = load_model()
+model, error = load_model(MODEL_PATH)
 
-# --- 3. INTERFACE ---
+# --- 4. INTERFACE ---
+if error:
+    st.error(f"Model Error: {error}")
+    st.info("Ensure you pushed the model via Git LFS and the path is correct.")
+
 source = st.radio("Choose Input Method:", ("Upload Image File", "Use Camera"))
 
 img_data = None
 if source == "Upload Image File":
-    img_data = st.file_uploader("Select image...", type=["jpg", "jpeg", "png"])
+    img_data = st.file_uploader("Select microfossil image...", type=["jpg", "jpeg", "png"])
 else:
-    img_data = st.camera_input("Capture specimen")
+    img_data = st.camera_input("Capture microscope specimen")
 
 if img_data is not None:
     image = Image.open(img_data).convert('RGB')
@@ -67,7 +81,7 @@ if img_data is not None:
     
     if st.button('🚀 Classify Specimen'):
         if model is not None:
-            with st.spinner('Analyzing...'):
+            with st.spinner('AI analyzing...'):
                 # Exact transforms from your training script
                 transform = transforms.Compose([
                     transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
@@ -81,7 +95,8 @@ if img_data is not None:
                     probs = torch.nn.functional.softmax(outputs, dim=1)
                     conf, idx = torch.max(probs, 1)
                 
-                st.success(f"### Identification: **{CLASSES[idx.item()]}**")
+                label = CLASSES[idx.item()]
+                st.success(f"### Identification: **{label}**")
                 st.info(f"**Confidence Score:** {conf.item()*100:.2f}%")
         else:
-            st.error(f"Model error: {error}")
+            st.error("Model is not loaded. Classification unavailable.")
