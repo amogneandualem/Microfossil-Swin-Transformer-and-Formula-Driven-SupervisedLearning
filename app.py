@@ -1,18 +1,16 @@
 import streamlit as st
 import torch
 import timm
-import os
-import urllib.request
 from torchvision import transforms
 from PIL import Image
 
-# --- 1. CONFIGURATION ---
-# The URL you provided for your model weights
-MODEL_URL = "https://huggingface.co/spaces/amogneandualem/microfossil-classifier/resolve/main/best_model.pth"
-MODEL_PATH = "best_model.pth"
+# --- CONFIGURATION ---
+# Since LFS finished, the file is now in: Best results/exfractal/best_model.pth
+# Or if you moved it to the root, just "best_model.pth"
+MODEL_PATH = "Best results/exfractal/best_model.pth" 
 MODEL_NAME = "swin_base_patch4_window7_224"
 
-# Exact list of 32 classes from your training
+# 32 Microfossil Classes
 CLASSES = [
     'Acanthodesmia_micropora', 'Actinomma_leptoderma_boreale',
     'Antarctissa_denticulata-cyrindrica', 'Antarctissa_juvenile',
@@ -31,24 +29,20 @@ CLASSES = [
     'Sylodictya_spp', 'Zygocircus'
 ]
 
-st.set_page_config(page_title="Microfossil AI", layout="centered")
-st.title("🔬 Microfossil Classification")
-
-# --- 2. LOADING LOGIC ---
 @st.cache_resource
 def load_model():
-    # If model is not found in the cloud workspace, download it from Hugging Face
-    if not os.path.exists(MODEL_PATH):
-        with st.spinner("📥 Downloading 349MB model from Hugging Face..."):
-            # This bypasses your local network upload issues
-            urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-            st.success("Download complete!")
-    
-    # Initialize the Swin Transformer
     model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=len(CLASSES))
+    # Load the file that was just pushed via LFS
     checkpoint = torch.load(MODEL_PATH, map_location="cpu")
-    
-    # Clean the state_dict (handles 'module.' or 'backbone.' prefixes)
     state_dict = checkpoint.get('model_state_dict') or checkpoint.get('model') or checkpoint
+    
+    # Clean prefixes
     cleaned_dict = {k.replace('module.', '').replace('backbone.', ''): v 
-                    for k, v in state
+                    for k, v in state_dict.items() if not k.startswith('head.')}
+    
+    model.load_state_dict(cleaned_dict, strict=False)
+    model.eval()
+    return model
+
+st.title("🔬 Microfossil Classifier")
+# Rest of UI code...
