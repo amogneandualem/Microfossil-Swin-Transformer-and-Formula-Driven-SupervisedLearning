@@ -4,14 +4,16 @@ import timm
 from PIL import Image
 from torchvision import transforms
 import os
+import time
 
 # ==================== CONFIGURATION ====================
-# Architecture MUST be 'base' to match your 1024-dim weights
+# MUST match your training script config
 MODEL_NAME = "swin_base_patch4_window7_224" 
 NUM_CLASSES = 32
 IMAGE_SIZE = 224
+# Path from your GitHub screenshot
+MODEL_PATH = "swin_final_results_advanced/best_model.pth"
 
-# The exact 32 classes from your dataset
 CLASSES = [
     'Acanthodesmia_micropora', 'Actinomma_leptoderma_boreale', 'Antarctissa_denticulata-cyrindrica', 
     'Antarctissa_juvenile', 'Antarctissa_longa-strelkovi', 'Botryocampe_antarctica', 
@@ -24,66 +26,69 @@ CLASSES = [
     'Siphocampe_arachnea_group', 'Spongodiscus', 'Spongurus_pylomaticus', 'Sylodictya_spp', 'Zygocircus'
 ]
 
-st.set_page_config(page_title="Microfossil PhD AI", layout="wide")
+st.set_page_config(page_title="Microfossil PhD AI", layout="centered")
 st.title("🔬 Microfossil Identification System")
 
-# ==================== MODEL LOADING ====================
+# ==================== ROBUST MODEL LOADING ====================
 @st.cache_resource
 def load_model():
-    # Initialize the correct model structure
-    model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
+    # 1. Wait for Git LFS if the file is too small (pointer file)
+    max_retries = 5
+    for i in range(max_retries):
+        if os.path.exists(MODEL_PATH):
+            file_size = os.path.getsize(MODEL_PATH)
+            if file_size > 100000000: # Ensure file is > 100MB
+                break
+        st.warning(f"⏳ Waiting for model weights to download via Git LFS (Attempt {i+1}/{max_retries})...")
+        time.sleep(10)
     
-    # Path confirmed from your GitHub screenshot
-    model_path = "swin_final_results_advanced/best_model.pth"
+    if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 100000000:
+        return None, "Model file not found or incomplete. Please wait 5 minutes and refresh."
 
-    if os.path.exists(model_path):
-        try:
-            # Load the checkpoint and extract weights
-            checkpoint = torch.load(model_path, map_location="cpu")
-            state_dict = checkpoint.get('model_state_dict', checkpoint)
-            
-            # Clean up key names for compatibility
-            state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
-            
-            # Load weights (strict=False handles minor timm naming variations)
-            model.load_state_dict(state_dict, strict=False)
-            model.eval()
-            return model, None
-        except Exception as e:
-            return None, str(e)
-    return None, f"Searching for file at: {os.path.abspath(model_path)}"
+    try:
+        # 2. Initialize Swin-Base (Matches 1024-dim weights)
+        model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
+        
+        checkpoint = torch.load(MODEL_PATH, map_location="cpu")
+        state_dict = checkpoint.get('model_state_dict', checkpoint)
+        
+        # 3. Clean keys from training wrappers
+        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+        
+        model.load_state_dict(state_dict, strict=False)
+        model.eval()
+        return model, None
+    except Exception as e:
+        return None, str(e)
 
 model, error = load_model()
 
-# ==================== USER INTERFACE ====================
+# ==================== UI LOGIC ====================
 if error:
-    st.error(f"🚨 Model Error: {error}")
-    st.info("Ensure the folder 'swin_final_results_advanced' exists in your GitHub root.")
+    st.error(f"🚨 {error}")
+    st.stop()
 
-source = st.radio("Choose Input Method:", ("Upload Image File", "Use Camera"))
-img_buffer = st.file_uploader("Select JPG/PNG", type=["jpg", "png", "jpeg"]) if source == "Upload Image File" else st.camera_input("Capture")
+st.success("✅ AI Model Loaded Successfully (Swin-Base)")
 
-if img_buffer:
-    image = Image.open(img_buffer).convert('RGB')
-    st.image(image, caption="Specimen Preview", use_container_width=True)
+uploaded_file = st.file_uploader("Upload Microfossil Image", type=["jpg", "png", "jpeg"])
+
+if uploaded_file:
+    image = Image.open(uploaded_file).convert('RGB')
+    st.image(image, caption="Specimen", use_container_width=True)
     
-    if st.button("🚀 Run AI Classification"):
-        if model:
-            with st.spinner('Analyzing specimen...'):
-                # Matches your eval_transform logic
-                preprocess = transforms.Compose([
-                    transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-                ])
-                input_tensor = preprocess(image).unsqueeze(0)
-                
-                with torch.no_grad():
-                    logits = model(input_tensor)
-                    probs = torch.nn.functional.softmax(logits, dim=1)
-                    confidence, index = torch.max(probs, 1)
-                
-                st.success(f"### Identification: **{CLASSES[index.item()]}**")
-                st.info(f"**Confidence Score:** {confidence.item()*100:.2f}%")
-        else:
-            st.error("Model is not loaded. Check the path error above.")
+    if st.button("🚀 Identify"):
+        # Preprocessing matches your training script exactly
+        transform = transforms.Compose([
+            transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+        
+        img_tensor = transform(image).unsqueeze(0)
+        with torch.no_grad():
+            output = model(img_tensor)
+            prob = torch.nn.functional.softmax(output, dim=1)
+            conf, idx = torch.max(prob, 1)
+            
+        st.header(f"Result: {CLASSES[idx.item()]}")
+        st.write(f"Confidence: {conf.item()*100:.2f}%")
