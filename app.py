@@ -7,11 +7,13 @@ from PIL import Image
 import urllib.request
 import os
 
-# --- 1. CONFIGURATION ---
+# --- 1. CONFIGURATION (Matching your Training Script) ---
 MODEL_URL = "https://huggingface.co/spaces/amogneandualem/microfossil-classifier/resolve/main/best_model.pth"
 MODEL_PATH = "best_model.pth"
+MODEL_NAME = "swin_base_patch4_window7_224" # Matched to your Config
+NUM_CLASSES = 32
 
-# IMPORTANT: Ensure these match the order of your training folders
+# Mapping for your 32 classes
 CLASS_NAMES = [
     "Diatoms", "Druppatractus_irregularis", "Eucyrtidium_spp", "Fragments", "Others",
     "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10",
@@ -27,23 +29,39 @@ st.title("🔬 Microfossil Identification System")
 @st.cache_resource
 def load_model():
     if not os.path.exists(MODEL_PATH):
-        with st.spinner("Downloading model weights from Hugging Face..."):
+        with st.spinner("Downloading trained model..."):
             urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
     
-    # Using 'swin_large_patch4_window7_224' to match your 1024/2048 channel sizes
-    model = timm.create_model('swin_large_patch4_window7_224', pretrained=False, num_classes=32)
+    # Create the exact model structure from your training code
+    model = timm.create_model(
+        MODEL_NAME,
+        pretrained=False,
+        num_classes=NUM_CLASSES
+    )
     
+    # Load the checkpoint
     checkpoint = torch.load(MODEL_PATH, map_location='cpu')
-    state_dict = checkpoint.get("model_state_dict", checkpoint)
+    
+    # Extract the state dict using your trainer's specific key
+    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+        state_dict = checkpoint['model_state_dict']
+    else:
+        state_dict = checkpoint
 
-    # strict=False handles non-matching buffers (like attn_masks)
-    model.load_state_dict(state_dict, strict=False)
+    # Clean the keys (handles the 'module.' prefix if you trained on Multi-GPU/DataParallel)
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        name = k.replace('module.', '').replace('backbone.', '')
+        new_state_dict[name] = v
+
+    # Load weights with strict=False to ignore non-essential buffer mismatches
+    model.load_state_dict(new_state_dict, strict=False)
     model.eval()
     return model
 
 try:
     model = load_model()
-    st.success("✅ Swin-Large Model Loaded Successfully!")
+    st.success(f"✅ {MODEL_NAME} Loaded Successfully!")
 except Exception as e:
     st.error(f"🚨 Setup Error: {e}")
     st.stop()
@@ -55,25 +73,22 @@ if uploaded_file:
     image = Image.open(uploaded_file).convert('RGB')
     st.image(image, caption="Uploaded Image", use_container_width=True)
     
+    # Exact transforms from your EfficientMicrofossilDataset eval_transform
     transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     
     input_tensor = transform(image).unsqueeze(0)
     
     with torch.no_grad():
         with st.spinner("Analyzing..."):
-            output = model(input_tensor)
-            prob = torch.nn.functional.softmax(output[0], dim=0)
+            outputs = model(input_tensor)
+            prob = torch.nn.functional.softmax(outputs[0], dim=0)
             confidence, prediction = torch.max(prob, 0)
     
-    st.subheader(f"Prediction: {CLASS_NAMES[prediction.item()]}")
+    label = CLASS_NAMES[prediction.item()]
+    st.subheader(f"Result: {label}")
+    st.progress(float(confidence.item()))
     st.write(f"**Confidence Score:** {confidence.item()*100:.2f}%")
-    
-    with st.expander("Show probabilities"):
-        for i, name in enumerate(CLASS_NAMES):
-            if prob[i] > 0.01:
-                st.write(f"{name}: {prob[i].item()*100:.1f}%")
