@@ -5,10 +5,9 @@ from PIL import Image
 from torchvision import transforms
 import os
 
-# --- 1. CONFIGURATION (Strictly matching your Training Script) ---
-# Your error confirms the checkpoint has Base-sized layers (1024/2048)
+# --- 1. CONFIGURATION ---
+# We will use this as a fallback, but the code below will search for it
 MODEL_NAME = "swin_base_patch4_window7_224" 
-MODEL_PATH = "swin_final_results_advanced/best_model.pth"
 NUM_CLASSES = 32
 IMAGE_SIZE = 224
 
@@ -27,42 +26,51 @@ CLASSES = [
 st.set_page_config(page_title="Microfossil PhD AI", layout="centered")
 st.title("🔬 Microfossil Identification System")
 
-# --- 2. DYNAMIC PATH LOCATOR ---
-# This ensures the file is found even if it's in a subfolder
-actual_path = MODEL_PATH
-if not os.path.exists(actual_path):
+# --- 2. DYNAMIC FILE SEARCHER ---
+# This locates the file even if it's buried in subfolders
+def find_model_file(filename="best_model.pth"):
     for root, dirs, files in os.walk("."):
-        for file in files:
-            if file == "best_model.pth":
-                actual_path = os.path.join(root, file)
-                break
+        if filename in files:
+            return os.path.join(root, filename)
+    return None
+
+actual_model_path = find_model_file()
 
 # --- 3. MODEL LOADING ---
 @st.cache_resource
 def load_model(path):
+    if not path:
+        return None, "File 'best_model.pth' was not found anywhere in the repository."
+    
     try:
-        # 1. Initialize the correct BASE architecture
+        # Initialize Swin-Base (1024-dim) to match your checkpoint
         model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
         
-        if os.path.exists(path):
-            checkpoint = torch.load(path, map_location="cpu")
-            # 2. Extract state_dict from trainer wrapper
-            state_dict = checkpoint.get('model_state_dict', checkpoint)
-            # 3. Clean 'module.' prefixes from training
-            state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
-            # 4. Load with strict=False to bypass minor metadata mismatches
-            model.load_state_dict(state_dict, strict=False)
-            model.eval()
-            return model, None
-        return None, "Checkpoint file not found."
+        checkpoint = torch.load(path, map_location="cpu")
+        
+        # Extract state_dict
+        state_dict = checkpoint.get('model_state_dict', checkpoint)
+        
+        # Remove 'module.' prefix if it exists
+        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+        
+        # Load weights with strict=False to handle metadata differences
+        model.load_state_dict(state_dict, strict=False)
+        model.eval()
+        return model, None
     except Exception as e:
         return None, str(e)
 
-model, error = load_model(actual_path)
+# Attempt to load
+model, error = load_model(actual_model_path)
 
-# --- 4. INTERFACE ---
+# --- 4. USER INTERFACE ---
 if error:
-    st.error(f"Critical Model Error: {error}")
+    st.error(f"🚨 Model Error: {error}")
+    if actual_model_path:
+        st.info(f"File was found at: {actual_model_path}")
+    else:
+        st.warning("Double check that you have committed 'best_model.pth' to GitHub.")
 
 source = st.radio("Input Method:", ("Upload File", "Use Camera"))
 img_data = st.file_uploader("Select image...", type=["jpg", "png"]) if source == "Upload File" else st.camera_input("Capture")
@@ -74,7 +82,6 @@ if img_data:
     if st.button('🚀 Classify Specimen'):
         if model:
             with st.spinner('Analyzing...'):
-                # Exact transforms from your training script
                 transform = transforms.Compose([
                     transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
                     transforms.ToTensor(),
@@ -89,3 +96,5 @@ if img_data:
                 
                 st.success(f"### Result: **{CLASSES[idx.item()]}**")
                 st.info(f"**Confidence Score:** {conf.item()*100:.2f}%")
+        else:
+            st.error("Model not ready. Check the errors above.")
