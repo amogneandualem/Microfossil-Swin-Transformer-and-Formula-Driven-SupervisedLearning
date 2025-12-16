@@ -5,11 +5,13 @@ from PIL import Image
 from torchvision import transforms
 import os
 
-# --- 1. CONFIGURATION ---
+# ==================== CONFIGURATION ====================
+# This matches your Config class in the training script
 MODEL_NAME = "swin_base_patch4_window7_224" 
 NUM_CLASSES = 32
 IMAGE_SIZE = 224
 
+# The exact 32 classes from your dataset directories
 CLASSES = [
     'Acanthodesmia_micropora', 'Actinomma_leptoderma_boreale', 'Antarctissa_denticulata-cyrindrica', 
     'Antarctissa_juvenile', 'Antarctissa_longa-strelkovi', 'Botryocampe_antarctica', 
@@ -22,62 +24,101 @@ CLASSES = [
     'Siphocampe_arachnea_group', 'Spongodiscus', 'Spongurus_pylomaticus', 'Sylodictya_spp', 'Zygocircus'
 ]
 
-st.set_page_config(page_title="Microfossil Identification", layout="centered")
+st.set_page_config(page_title="Microfossil PhD AI", layout="wide")
 st.title("🔬 Microfossil Identification System")
+st.markdown("---")
 
-# --- 2. DYNAMIC FILE SEARCHER ---
-def find_model_file(filename="best_model.pth"):
-    for root, dirs, files in os.walk("."):
-        if filename in files:
-            full_path = os.path.join(root, filename)
-            # Check if it's the actual file or just a 1KB LFS pointer
-            if os.path.getsize(full_path) > 1000000: # Larger than 1MB
-                return full_path
-    return None
-
-actual_path = find_model_file()
-
-# --- 3. MODEL LOADING ---
+# ==================== MODEL LOADING ====================
 @st.cache_resource
-def load_model(path):
-    if not path:
-        return None, "Checkpoint not found or file is still an LFS pointer (1KB)."
-    try:
-        model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
-        checkpoint = torch.load(path, map_location="cpu")
-        state_dict = checkpoint.get('model_state_dict', checkpoint)
-        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
-        model.load_state_dict(state_dict, strict=False)
-        model.eval()
-        return model, None
-    except Exception as e:
-        return None, str(e)
+def load_model():
+    # 1. Initialize the Base model structure (1024-dim)
+    model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
+    
+    # 2. Dynamic search for best_model.pth (checks Replicates folders)
+    model_file = None
+    for root, dirs, files in os.walk("."):
+        if "best_model.pth" in files:
+            full_path = os.path.join(root, "best_model.pth")
+            # Ensure we pick the actual large weights file, not a small LFS pointer
+            if os.path.getsize(full_path) > 100 * 1024 * 1024: 
+                model_file = full_path
+                break
 
-model, error = load_model(actual_path)
+    if model_file:
+        try:
+            # Load weights (map to CPU for Streamlit)
+            checkpoint = torch.load(model_file, map_location="cpu")
+            state_dict = checkpoint.get('model_state_dict', checkpoint)
+            
+            # Remove 'module.' prefix from DataParallel/Distributed training
+            state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+            
+            # Load into model
+            model.load_state_dict(state_dict, strict=True)
+            model.eval()
+            return model, f"Loaded: {model_file}"
+        except Exception as e:
+            return None, f"Error loading weights: {str(e)}"
+    return None, "Model weights (best_model.pth) not found. Ensure Git LFS is synced."
 
-# --- 4. USER INTERFACE ---
-if error:
-    st.error(f"🚨 Model Error: {error}")
-    st.info("Wait 5 minutes for Git LFS to finish downloading the large file.")
+model, status = load_model()
 
-source = st.radio("Input Method:", ("Upload File", "Use Camera"))
-img_data = st.file_uploader("Select image...", type=["jpg", "png"]) if source == "Upload File" else st.camera_input("Capture")
+# ==================== USER INTERFACE ====================
+col1, col2 = st.columns([1, 1])
 
-if img_data:
-    image = Image.open(img_data).convert('RGB')
-    st.image(image, caption='Preview', use_container_width=True)
-    if st.button('🚀 Classify Specimen'):
-        if model:
-            with st.spinner('Analyzing...'):
-                transform = transforms.Compose([
+with col1:
+    st.header("1. Input Specimen")
+    source = st.radio("Choose source:", ("Upload Image", "Use Camera"))
+    
+    img_buffer = None
+    if source == "Upload Image":
+        img_buffer = st.file_uploader("Select JPG/PNG", type=["jpg", "png", "jpeg"])
+    else:
+        img_buffer = st.camera_input("Take photo")
+
+with col2:
+    st.header("2. Analysis Result")
+    if img_buffer:
+        image = Image.open(img_buffer).convert('RGB')
+        st.image(image, caption="Current Specimen", use_container_width=True)
+        
+        if st.button("🚀 Run AI Classification"):
+            if model:
+                # Same normalization as Config.eval_transform in training
+                preprocess = transforms.Compose([
                     transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
                     transforms.ToTensor(),
                     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
                 ])
-                input_tensor = transform(image).unsqueeze(0)
+                
+                input_tensor = preprocess(image).unsqueeze(0)
+                
                 with torch.no_grad():
-                    outputs = model(input_tensor)
-                    probs = torch.nn.functional.softmax(outputs, dim=1)
-                    conf, idx = torch.max(probs, 1)
-                st.success(f"### Result: **{CLASSES[idx.item()]}**")
-                st.info(f"**Confidence Score:** {conf.item()*100:.2f}%")
+                    logits = model(input_tensor)
+                    probs = torch.nn.functional.softmax(logits, dim=1)
+                    confidence, index = torch.max(probs, 1)
+                
+                result_class = CLASSES[index.item()]
+                conf_score = confidence.item() * 100
+                
+                st.success(f"### Identification: **{result_class}**")
+                st.metric("Confidence Score", f"{conf_score:.2f}%")
+                
+                # Show top 3 probabilities
+                top3_prob, top3_idx = torch.topk(probs, 3)
+                st.write("Top 3 Predictions:")
+                for i in range(3):
+                    st.write(f"- {CLASSES[top3_idx[0][i].item()]}: {top3_prob[0][i].item()*100:.1f}%")
+            else:
+                st.error(f"System Error: {status}")
+    else:
+        st.info("Awaiting specimen input...")
+
+# Sidebar Info
+st.sidebar.title("System Status")
+if model:
+    st.sidebar.success("✅ AI Model Online")
+    st.sidebar.info(status)
+else:
+    st.sidebar.error("❌ AI Model Offline")
+    st.sidebar.warning(status)
