@@ -1,12 +1,3 @@
 *.pth filter=lfs diff=lfs merge=lfs -text
 *.tar filter=lfs diff=lfs merge=lfs -text
 swin_final_results_advanced/best_model.pth filter=lfs diff=lfs merge=lfs -text
-
-# Add the configuration files and the model
-git add .gitattributes
-git add .gitignore
-git add swin_final_results_advanced/best_model.pth
-
-# Commit and Push
-git commit -m "Fix: Properly uploading 332MB model file via LFS"
-git push
