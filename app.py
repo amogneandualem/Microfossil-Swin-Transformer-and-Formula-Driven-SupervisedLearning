@@ -4,15 +4,12 @@ import timm
 from PIL import Image
 from torchvision import transforms
 import os
-import time
 
-# ==================== CONFIGURATION ====================
-# Swin-Base is REQUIRED to match your 1024-dim weights
-MODEL_NAME = "swin_base_patch4_window7_224" 
+# CONFIGURATION
+MODEL_NAME = "swin_base_patch4_window7_224" # FIXES: Size mismatch (1024-dim)
 NUM_CLASSES = 32
 IMAGE_SIZE = 224
 
-# The exact 32 classes from your training dataset
 CLASSES = [
     'Acanthodesmia_micropora', 'Actinomma_leptoderma_boreale', 'Antarctissa_denticulata-cyrindrica', 
     'Antarctissa_juvenile', 'Antarctissa_longa-strelkovi', 'Botryocampe_antarctica', 
@@ -25,67 +22,52 @@ CLASSES = [
     'Siphocampe_arachnea_group', 'Spongodiscus', 'Spongurus_pylomaticus', 'Sylodictya_spp', 'Zygocircus'
 ]
 
-st.set_page_config(page_title="Microfossil PhD AI", layout="centered")
-st.title("🔬 Microfossil Identification System")
+st.set_page_config(page_title="Microfossil PhD AI", layout="wide")
 
-# ==================== ROBUST MODEL LOADING ====================
 @st.cache_resource
 def load_model():
-    target_file = "best_model.pth"
+    # Automatically find best_model.pth in any subfolder
+    target = "best_model.pth"
     model_path = None
-    
-    # 1. Recursive search to find the file anywhere in the repo
     for root, dirs, files in os.walk("."):
-        if target_file in files:
-            path = os.path.join(root, target_file)
-            # 2. Check for real file size (>100MB) vs 1KB LFS pointer
-            if os.path.getsize(path) > 100 * 1024 * 1024:
+        if target in files:
+            path = os.path.join(root, target)
+            if os.path.getsize(path) > 100 * 1024 * 1024: # Check if > 100MB
                 model_path = path
                 break
-
+    
     if not model_path:
-        # Diagnostic: Check if it exists as a tiny pointer
-        for root, dirs, files in os.walk("."):
-            if target_file in files:
-                size_kb = os.path.getsize(os.path.join(root, target_file)) / 1024
-                return None, f"LFS Syncing: File found but only {size_kb:.2f}KB. Wait 5 mins for download."
-        return None, f"File '{target_file}' not found in any folder. Ensure you pushed the model."
+        return None, "best_model.pth not found. Is it pushed to GitHub via LFS?"
 
     try:
-        # 3. Initialize Swin-Base structure to fix the Size Mismatch
-        # This builds the 1024 and 2048 dim layers you need.
         model = timm.create_model(MODEL_NAME, pretrained=False, num_classes=NUM_CLASSES)
-        
-        # 4. Load weights onto CPU
         checkpoint = torch.load(model_path, map_location="cpu")
         state_dict = checkpoint.get('model_state_dict', checkpoint)
         
-        # 5. Clean training prefixes
+        # Strip prefixes like 'module.' or 'backbone.'
         state_dict = {k.replace('module.', '').replace('backbone.', ''): v for k, v in state_dict.items()}
         
         model.load_state_dict(state_dict, strict=False)
         model.eval()
-        return model, f"Loaded from: {model_path}"
+        return model, f"✅ Model Loaded from: {model_path}"
     except Exception as e:
         return None, str(e)
 
 model, status = load_model()
 
-# ==================== USER INTERFACE ====================
 if not model:
     st.error(f"🚨 Setup Error: {status}")
-    if st.button("🔄 Reload App"):
-        st.rerun()
+    st.info("Check your GitHub repo to see if 'best_model.pth' is actually 332MB.")
 else:
-    st.success(f"✅ AI Online | {status}")
-    
-    img_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+    st.success(status)
+    # --- Prediction UI ---
+    img_file = st.file_uploader("Upload Fossil Image", type=["jpg", "png", "jpeg"])
     if img_file:
         image = Image.open(img_file).convert('RGB')
-        st.image(image, caption="Specimen Preview", use_container_width=True)
+        st.image(image, caption="Specimen", width=400)
         
-        if st.button("🚀 Identify Specimen"):
-            # Normalization parameters from your training script
+        if st.button("🚀 Identify"):
+            # Matches your training normalization
             transform = transforms.Compose([
                 transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
                 transforms.ToTensor(),
@@ -95,8 +77,6 @@ else:
             
             with torch.no_grad():
                 output = model(input_tensor)
-                prob = torch.nn.functional.softmax(output, dim=1)
-                conf, idx = torch.max(prob, 1)
+                idx = torch.argmax(output, 1).item()
             
-            st.header(f"Result: {CLASSES[idx.item()]}")
-            st.write(f"Confidence Level: {conf.item()*100:.2f}%")
+            st.header(f"Result: {CLASSES[idx]}")
